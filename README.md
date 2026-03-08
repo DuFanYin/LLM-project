@@ -23,36 +23,27 @@ Fine-tune **Qwen2.5** on math (e.g. GSM8K) with **LoRA**, then run inference wit
 pip install -r requirements.txt
 ```
 
-From repo root, run the full pipeline on a tiny subset (smoke test):
+The flow is split into three steps; you can run any step alone (no need to run the full pipeline):
 
-```python
-from main import run_full_flow
-from qwen_math_flow import StubCalculatorClient
+| Step | Command | Description |
+|------|---------|-------------|
+| **1. RAG test** | `python main.py rag_test` | Test calculator + RAG parse/replace only; no model load. |
+| **2. Train and save** | `python main.py train_save` | Train only and save adapter/tokenizer to `output/lora_math`. |
+| **3. Inference** | `python main.py inference --adapter-dir output/lora_math` | Load from saved dir and run one inference with RAG. |
 
-result = run_full_flow(
-    max_train_samples=20,
-    num_epochs=1,
-    output_dir="output/lora_math_smoke",
-    calculator_client=StubCalculatorClient(),
-)
-# result["peft_model"], result["tokenizer"], result["rag_layer"]; adapter saved under output_dir
-```
-
-Confirm that `output/lora_math_smoke` exists and contains the adapter. Optionally run one inference with `inference_with_rag(result["peft_model"], result["tokenizer"], result["rag_layer"], "What is [CALC: 5*6]?")` to verify the RAG path.
+Run all three in sequence (small scale): `python main.py all` (default 20 samples, 1 epoch; smoke test only).
 
 ---
 
 ## Step-by-step: how to run the project
 
-Start small to verify the pipeline, then scale up.
-
 | Phase | Goal | What to do |
 |-------|------|------------|
-| **1. Setup** | Environment ready | `pip install -r requirements.txt`. Ensure GPU with enough VRAM (see [Hardware](#hardware-and-training-time) below). |
-| **2. Smoke test** | Pipeline runs end-to-end | Run `run_full_flow(max_train_samples=20, num_epochs=1, output_dir="...")`. Check that training finishes and `output_dir` has adapter + tokenizer. Optionally test RAG with one query. |
-| **3. Small run + eval** | First real training and metric | Use ~500–1k samples, 2 epochs. Load adapter from `output_dir`, run inference on 50–100 test examples, compute exact match (or your metric). |
-| **4. Full run** | Production-style training | Full GSM8K train (~7.5k), 2–3 epochs. Evaluate on full test set. If you have VRAM for 7B, switch to Qwen2.5-7B and repeat. |
-| **5. Deploy** | Serve model + RAG | Replace stub with your `CalculatorClient`. Serve base model + adapter (e.g. `PeftModel.from_pretrained`); in the API path, run the RAG layer after each generation. |
+| **1. RAG test** | Verify calculator and RAG | `python main.py rag_test` or `from main import run_rag_test; run_rag_test()`. |
+| **2. Train and save** | Get adapter | `python main.py train_save` or call `train_and_save(output_dir=..., max_train_samples=..., num_epochs=...)`. For larger runs, change `--max-train-samples` / `--epochs` or pass args. |
+| **3. Inference** | Use saved params for inference | `python main.py inference --adapter-dir output/lora_math` or `run_inference(adapter_dir="output/lora_math", user_query="...")`. |
+| **4. Scale up** | Full training + eval | In code call `train_and_save(max_train_samples=None, num_epochs=3)` etc.; then evaluate on test set (e.g. EM). |
+| **5. Deploy** | Serve model + RAG | Load with `load_for_inference(adapter_dir)`, plug in your `CalculatorClient` and RAG layer in your API. |
 
 ---
 
@@ -67,7 +58,7 @@ qwen_math_flow/
 ├── lora_finetune.py        # LoRA + Trainer
 ├── rag_calculator.py       # Extract [CALC: ...], call calculator, augment context
 └── external_calculator.py  # CalculatorClient, Stub, SafeEval
-main.py                     # run_full_flow(), build_rag_only(), inference_with_rag()
+main.py                     # 1. run_rag_test()  2. train_and_save()  3. load_for_inference(), run_inference(), inference_with_rag()
 requirements.txt
 ```
 
@@ -75,10 +66,10 @@ requirements.txt
 
 1. **Download** — `download_qwen_25_07b()`: base model + tokenizer; optional 4-bit/8-bit and `device_map`.
 2. **Data** — `load_math_dataset()` + `format_gsm8k_as_chat()` (or custom formatter) → `tokenize_math_dataset()` / `load_and_tokenize_math()`: chat template + labels masked so only the assistant reply is trained.
-3. **LoRA** — `create_lora_model()` adds PEFT LoRA (default: q/k/v/o_proj); `run_finetune()` runs Trainer and saves adapter + tokenizer to `output_dir`.
+3. **LoRA** — `create_lora_model()` adds PEFT LoRA (default: q/k/v/o_proj); `run_finetune()` runs Trainer and saves adapter + tokenizer to `output_dir`. For inference only later, use `load_for_inference(adapter_dir)` (see Usage examples).
 4. **RAG** — Used at inference only. `RAGCalculatorLayer` finds placeholders (`[CALC: ...]`, ` ```calc ... ``` `, `<calculator>...</calculator>`), calls `CalculatorClient.evaluate()`, and injects results into the text.
 
-**Prompt engineering:** Not required for training. The repo optionally wraps the user message with an instruction (e.g. “Solve the following math problem step by step”); you can change or remove it in `format_gsm8k_as_chat` / `format_math_as_chat` in `load_dataset.py`.
+**Prompt engineering:** Not required for training. The repo optionally wraps the user message with an instruction (e.g. "Solve the following math problem step by step"); you can change or remove it in `format_gsm8k_as_chat` / `format_math_as_chat` in `load_dataset.py`.
 
 ### Calculator
 
@@ -135,39 +126,38 @@ QLoRA is often 20–40% slower than fp16 LoRA at similar VRAM.
 
 ## Usage examples
 
-**Full pipeline + inference with RAG**
+**1. RAG test only (no model load)**
 
 ```python
-from main import run_full_flow, inference_with_rag
-from qwen_math_flow import StubCalculatorClient
-
-result = run_full_flow(
-    dataset_name="openai/gsm8k",
-    max_train_samples=200,
-    max_length=512,
-    output_dir="output/lora_math",
-    num_epochs=2,
-    calculator_client=StubCalculatorClient(),
-)
-model, tokenizer, rag = result["peft_model"], result["tokenizer"], result["rag_layer"]
-
-answer = inference_with_rag(
-    model, tokenizer, rag,
-    "What is 15 * 12? Use [CALC: 15*12] for the computation.",
-    max_new_tokens=128,
-    max_calculator_rounds=3,
-)
+from main import run_rag_test
+run_rag_test(use_safe_eval=True)  # Use SafeEval for real math; False for Stub
 ```
 
-**RAG only (e.g. with SafeEval calculator)**
+**2. Train and save only**
 
 ```python
-from main import build_rag_only
+from main import train_and_save
+train_and_save(
+    output_dir="output/lora_math",
+    max_train_samples=500,
+    num_epochs=2,
+)
+# Adapter + tokenizer written to output_dir
+```
+
+**3. Inference only (load from saved dir)**
+
+```python
+from main import run_inference, load_for_inference, inference_with_rag, build_rag_only
 from qwen_math_flow import SafeEvalCalculatorClient
 
+# Option A: one-liner
+run_inference(adapter_dir="output/lora_math", user_query="What is [CALC: 7*8]?")
+
+# Option B: compose RAG + inference yourself
+model, tokenizer = load_for_inference(adapter_dir="output/lora_math")
 rag = build_rag_only(calculator_client=SafeEvalCalculatorClient())
-augmented, results = rag.augment("Result: [CALC: 2+3*4]")
-# results == [("2+3*4", "14")]
+answer = inference_with_rag(model, tokenizer, rag, "What is [CALC: 15*12]?")
 ```
 
 ---

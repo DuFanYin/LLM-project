@@ -6,7 +6,7 @@ Supports Qwen chat format and label masking (train only on assistant responses).
 
 from typing import Any, Callable, Dict, List, Optional, Union
 
-# Lazy: datasets, transformers
+from datasets import load_dataset as hf_load
 
 
 # ---------------------------------------------------------------------------
@@ -43,8 +43,6 @@ def load_math_dataset(
         If prompt_template is used and not streaming: (dataset, list of formatted strings).
         Otherwise: dataset only.
     """
-    from datasets import load_dataset as hf_load
-
     dataset = hf_load(name, subset, split=split, streaming=streaming, **kwargs)
 
     if max_samples is not None and not streaming:

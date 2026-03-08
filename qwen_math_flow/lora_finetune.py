@@ -8,7 +8,8 @@ Optional 4-bit/8-bit base model support via prepare_model_for_kbit_training.
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-# Lazy: peft, transformers, torch
+from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+from transformers import DataCollatorForLanguageModeling, Trainer, TrainingArguments
 
 
 def create_lora_model(
@@ -37,8 +38,6 @@ def create_lora_model(
     Returns:
         PEFT model (PeftModel) ready for training.
     """
-    from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
-
     if use_4bit_or_8bit:
         model = prepare_model_for_kbit_training(model)
 
@@ -62,7 +61,6 @@ def _default_data_collator(
     pad_to_multiple_of: Optional[int] = 8,
 ) -> Any:
     """Build a data collator that pads to batch and respects labels."""
-    from transformers import DataCollatorForLanguageModeling
     return DataCollatorForLanguageModeling(
         tokenizer=tokenizer,
         mlm=False,
@@ -121,8 +119,6 @@ def run_finetune(
     Returns:
         Trainer state / metrics (trainer.state.log_history, etc.).
     """
-    from transformers import Trainer, TrainingArguments
-
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 

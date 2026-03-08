@@ -1,5 +1,5 @@
 """
-Qwen2.5 0.7B math flow: download → dataset → LoRA fine-tune → RAG calculator.
+Qwen2.5 math flow: download -> dataset -> LoRA fine-tune -> RAG calculator.
 """
 
 from .download_model import download_qwen_25_07b

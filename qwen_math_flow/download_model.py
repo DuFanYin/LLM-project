@@ -7,7 +7,8 @@ Uses Qwen2.5-0.5B-Instruct (smallest available on HF; no 0.7B exists).
 from pathlib import Path
 from typing import Any, Optional, Tuple
 
-# Lazy imports: transformers, optional bitsandbytes for 4-bit
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
 
 def download_qwen_25_07b(
@@ -40,9 +41,6 @@ def download_qwen_25_07b(
     Returns:
         Tuple of (model, tokenizer).
     """
-    from transformers import AutoModelForCausalLM, AutoTokenizer
-    import torch
-
     model_id = "Qwen/Qwen2.5-0.5B-Instruct"
     cache_path = Path(cache_dir) if cache_dir else None
     dtype = torch_dtype if torch_dtype is not None else "auto"
@@ -64,9 +62,6 @@ def download_qwen_25_07b(
         model_kwargs["device_map"] = device_map
 
     if load_in_4bit or load_in_8bit:
-        from transformers import BitsAndBytesConfig
-        import torch
-
         compute_dtype = bnb_4bit_compute_dtype or torch.bfloat16
         quantization_config = BitsAndBytesConfig(
             load_in_4bit=load_in_4bit,
