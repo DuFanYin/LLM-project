@@ -169,9 +169,12 @@ class RAGCalculatorLayer:
             "pad_token_id": pad_token_id,
             "eos_token_id": eos_token_id,
         }
-        if temperature is not None:
+        # Only add sampling params if the model's generation_config supports them,
+        # to avoid \"invalid generation flag\" warnings in newer transformers.
+        gen_cfg = getattr(model, "generation_config", None)
+        if temperature is not None and gen_cfg is not None and hasattr(gen_cfg, "temperature"):
             gen_params["temperature"] = temperature
-        if top_p is not None:
+        if top_p is not None and gen_cfg is not None and hasattr(gen_cfg, "top_p"):
             gen_params["top_p"] = top_p
         gen_params.update(kwargs)
 

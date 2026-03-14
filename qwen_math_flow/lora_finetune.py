@@ -128,13 +128,20 @@ def run_finetune(
     if save_steps is None:
         save_steps = max(10, steps_per_epoch // 2)
 
+    # Compute warmup_steps explicitly instead of using warmup_ratio arg on TrainingArguments
+    if max_steps and max_steps > 0:
+        total_steps = max_steps
+    else:
+        total_steps = steps_per_epoch * num_epochs
+    warmup_steps = int(total_steps * warmup_ratio) if warmup_ratio > 0 else 0
+
     training_args = TrainingArguments(
         output_dir=str(output_path),
         num_train_epochs=num_epochs,
         per_device_train_batch_size=per_device_train_batch_size,
         gradient_accumulation_steps=gradient_accumulation_steps,
         learning_rate=learning_rate,
-        warmup_ratio=warmup_ratio,
+        warmup_steps=warmup_steps,
         logging_steps=logging_steps,
         save_steps=save_steps,
         save_total_limit=save_total_limit,
@@ -156,7 +163,6 @@ def run_finetune(
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         data_collator=data_collator,
-        tokenizer=tokenizer,
     )
     trainer.train()
     trainer.save_model(str(output_path))
