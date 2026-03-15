@@ -2,15 +2,105 @@
 Load a math dataset for fine-tuning (e.g. GSM8K, MATH) and tokenize for causal LM.
 
 Supports Qwen chat format and label masking (train only on assistant responses).
+Multi-dataset loading (GSM8K, ASDiv, MetaMathQA, OpenMathInstruct) for combined LoRA training.
 """
 
 from typing import Any, Callable, Dict, List, Optional, Union
 
-from datasets import load_dataset as hf_load
+from datasets import Dataset, concatenate_datasets, load_dataset as hf_load
 
 
 # ---------------------------------------------------------------------------
-# Dataset loading
+# Multi-dataset config (aligned with Prompt.ipynb)
+# ---------------------------------------------------------------------------
+
+def _asdiv_question(sample: Dict[str, Any]) -> str:
+    text = sample.get("text", "")
+    return text.replace("Question:", "").replace("Answer:", "").strip()
+
+
+def _asdiv_answer(sample: Dict[str, Any]) -> str:
+    return sample.get("label", "")
+
+
+MULTI_DATASET_CONFIG: List[Dict[str, Any]] = [
+    {
+        "name": "gsm8k",
+        "path": "gsm8k",
+        "subset": "main",
+        "split": "train",
+        "extract_question": lambda s: s.get("question", ""),
+        "extract_answer": lambda s: s.get("answer", ""),
+    },
+    {
+        "name": "asdiv",
+        "path": "yimingzhang/asdiv",
+        "subset": None,
+        "split": "train",
+        "extract_question": _asdiv_question,
+        "extract_answer": _asdiv_answer,
+    },
+    {
+        "name": "metamathqa",
+        "path": "meta-math/MetaMathQA",
+        "subset": None,
+        "split": "train",
+        "extract_question": lambda s: s.get("original_question", ""),
+        "extract_answer": lambda s: s.get("response", ""),
+    },
+    {
+        "name": "openmathinstruct",
+        "path": "nvidia/OpenMathInstruct-1",
+        "subset": None,
+        "split": "train",
+        "extract_question": lambda s: s.get("question", ""),
+        "extract_answer": lambda s: s.get("expected_answer", ""),
+    },
+]
+
+
+def load_multi_math_dataset(
+    max_per_dataset: Optional[int] = 1000,
+    splits: Optional[Dict[str, str]] = None,
+) -> Dataset:
+    """
+    Load 4 math datasets (GSM8K, ASDiv, MetaMathQA, OpenMathInstruct), take up to
+    max_per_dataset from each, normalize to question/answer, and concatenate.
+
+    Args:
+        max_per_dataset: Max examples per dataset (default 1000 for testing).
+            Pass None to use the full dataset (no cap).
+        splits: Optional override of split per dataset name, e.g. {"gsm8k": "train"}.
+
+    Returns:
+        HuggingFace Dataset with columns "question" and "answer".
+    """
+    splits = splits or {}
+    parts: List[Dataset] = []
+
+    for cfg in MULTI_DATASET_CONFIG:
+        name = cfg["name"]
+        split = splits.get(name, cfg["split"])
+        subset = cfg["subset"]
+        path = cfg["path"]
+        extract_q = cfg["extract_question"]
+        extract_a = cfg["extract_answer"]
+
+        ds = hf_load(path, subset, split=split)
+        n = len(ds) if max_per_dataset is None else min(max_per_dataset, len(ds))
+        ds = ds.select(range(n))
+
+        questions = [extract_q(ds[i]) for i in range(n)]
+        answers = [extract_a(ds[i]) for i in range(n)]
+
+        part = Dataset.from_dict({"question": questions, "answer": answers})
+        parts.append(part)
+
+    return concatenate_datasets(parts)
+
+
+# ---------------------------------------------------------------------------
+# Dataset loading (single-dataset)
 # ---------------------------------------------------------------------------
 
 
@@ -80,6 +170,14 @@ def format_gsm8k_as_chat(sample: Dict[str, Any]) -> List[Dict[str, str]]:
     ]
 
 
+def format_multi_math_as_chat(sample: Dict[str, Any]) -> List[Dict[str, str]]:
+    """
+    Format a sample with keys question/answer (e.g. from load_multi_math_dataset) as Qwen chat.
+    Same instruction style as format_gsm8k_as_chat for consistency.
+    """
+    return format_gsm8k_as_chat(sample)
+
+
 def format_math_as_chat(
     question_key: str = "question",
     answer_key: str = "answer",
@@ -109,7 +207,7 @@ def tokenize_math_dataset(
     message_formatter: Callable[[Dict[str, Any]], List[Dict[str, str]]],
     max_length: int = 512,
     max_samples: Optional[int] = None,
-    padding: str = "longest",
+    padding: str = "max_length",
     truncation: bool = True,
     return_tensors: Optional[str] = None,
 ) -> Any:

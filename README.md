@@ -83,6 +83,24 @@ requirements.txt
 - **Calculator:** In production, use a real `CalculatorClient` (API or sandboxed process), not raw user input in `SafeEvalCalculatorClient`.
 - **RAG:** In the serving path, after each generation run the RAG layer (extract placeholders → call calculator → replace); optionally loop for multiple rounds. See `inference_with_rag()` in `main.py`.
 
+### Datasets (reference)
+
+| Dataset | Examples | Typical file size |
+|---------|----------|-------------------|
+| **GSM8K** | ~9K | ~6–8 MB |
+| **ASDiv** | ~2.3K | ~1–2 MB |
+| **MetaMathQA** | ~395K | ~300–500 MB |
+| **OpenMathInstruct** | ~1.8M | ~1.5–3 GB |
+
+**Approximate training time per dataset** (LoRA, 3 epochs, ~512 tokens, batch 4–8; single GPU). Actual time depends on hardware, batch size, and sequence length.
+
+| Dataset | ~0.5B / 0.7B | 7B |
+|---------|----------------|-----|
+| **ASDiv** (~2.3K) | ~10–25 min | ~45 min–2 h |
+| **GSM8K** (~9K) | ~30 min–1.5 h | ~3–8 h |
+| **MetaMathQA** (~395K) | ~20–65 h | ~4–14 days |
+| **OpenMathInstruct** (~1.8M) | ~4–12 days | ~3–8 weeks |
+
 ### Hardware and training time
 
 Two model options; single-GPU, LoRA (and QLoRA). Batch size and sequence length affect actual use.
@@ -96,8 +114,8 @@ Two model options; single-GPU, LoRA (and QLoRA). Batch size and sequence length 
 
 **Estimated time** (LoRA, ~512 tokens, batch 4–8, 2–3 epochs)
 
-| Model size | ~1k samples, 2 epochs | Full GSM8K (~7.5k), 3 epochs |
-|------------|------------------------|------------------------------|
+| Model size | ~1k samples, 2 epochs | Full GSM8K (~9K), 3 epochs |
+|------------|------------------------|-----------------------------|
 | **~0.5B / 0.7B** | ~5–15 min | ~30 min–1.5 h |
 | **7B** | ~30 min–1.5 h | ~3–8 h |
 
