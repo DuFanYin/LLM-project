@@ -23,7 +23,7 @@ This file explains what each cell in `Main.ipynb` does, how it maps to `main.py`
   - Imports project helpers:
     - `download_qwen_25_07b` (load base Qwen2.5-0.5B-Instruct)
     - `SafeEvalCalculatorClient`, `StubCalculatorClient` (calculator backends)
-    - Dataset helpers: `format_gsm8k_as_chat`, `format_multi_math_as_chat`, `load_and_tokenize_math`, `load_multi_math_dataset`, `tokenize_math_dataset`
+    - Dataset helpers: `format_gsm8k_as_chat`, `load_and_tokenize_math`
     - LoRA helpers: `create_lora_model`, `run_finetune`
     - RAG: `RAGCalculatorLayer`
 - **Matches**:
@@ -85,12 +85,10 @@ from hyperparameters import (
     LORA_ALPHA,
     LORA_R,
     MAX_LENGTH,
-    MAX_PER_DATASET,
     MAX_TRAIN_SAMPLES,
     MODEL_CACHE_DIR,
     NUM_EPOCHS,
     PER_DEVICE_TRAIN_BATCH_SIZE,
-    USE_MULTI_DATASET,
 )
 
 model, tokenizer = download_qwen_25_07b(
@@ -98,22 +96,16 @@ model, tokenizer = download_qwen_25_07b(
     load_in_4bit=LOAD_IN_4BIT,
     device_map="auto" if LOAD_IN_4BIT else None,
 )
-if USE_MULTI_DATASET:
-    raw_train = load_multi_math_dataset(max_per_dataset=MAX_PER_DATASET)
-    tokenized_train = tokenize_math_dataset(
-        raw_train, tokenizer, message_formatter=format_multi_math_as_chat, max_length=MAX_LENGTH
-    )
-    cap_msg = "full dataset" if MAX_PER_DATASET is None else f"up to {MAX_PER_DATASET} per dataset"
-    print(f"Multi-dataset training: {len(tokenized_train)} samples ({cap_msg}), {NUM_EPOCHS} epoch(s).")
-else:
-    tokenized_train = load_and_tokenize_math(
-        tokenizer,
-        name=DATASET_NAME,
-        split=DATASET_SPLIT,
-        max_samples=MAX_TRAIN_SAMPLES,
-        max_length=MAX_LENGTH,
-        message_formatter=format_gsm8k_as_chat,
-    )
+tokenized_train = load_and_tokenize_math(
+    tokenizer,
+    name=DATASET_NAME,
+    split=DATASET_SPLIT,
+    max_samples=MAX_TRAIN_SAMPLES,
+    max_length=MAX_LENGTH,
+    message_formatter=format_gsm8k_as_chat,
+)
+cap_msg = "full train split" if MAX_TRAIN_SAMPLES is None else f"up to {MAX_TRAIN_SAMPLES} samples"
+print(f"GSM8K training: {len(tokenized_train)} samples ({cap_msg}), {NUM_EPOCHS} epoch(s).")
 peft_model = create_lora_model(
     model,
     r=LORA_R,
@@ -134,15 +126,10 @@ print(f"Train done. Adapter + tokenizer saved to: {ADAPTER_DIR}\\n")
 ```
 
 - **Hyperparameters used** (all defined in `hyperparameters.py`):
-  - **Data selection**:
-    - `USE_MULTI_DATASET`:
-      - **True**: use 4-way mix (GSM8K, ASDiv, MetaMathQA, OpenMathInstruct) via `load_multi_math_dataset`.
-      - **False**: use single dataset (`DATASET_NAME`, `DATASET_SPLIT`) via `load_and_tokenize_math`.
-    - `MAX_PER_DATASET`:
-      - If multi-dataset: max examples per source (e.g. 100 → 400 total).
-      - `None`: full dataset for each source.
-    - `DATASET_NAME`, `DATASET_SPLIT`, `MAX_TRAIN_SAMPLES`:
-      - Used only when `USE_MULTI_DATASET` is False.
+  - **Data selection (GSM8K only)**:
+    - `DATASET_NAME`: e.g. `openai/gsm8k`.
+    - `DATASET_SPLIT`: usually `train`.
+    - `MAX_TRAIN_SAMPLES`: cap on examples (`None` = full split).
   - **Tokenization**:
     - `MAX_LENGTH`: max sequence length (chat prompt + answer), also used for padding.
   - **LoRA / training**:
@@ -157,24 +144,20 @@ print(f"Train done. Adapter + tokenizer saved to: {ADAPTER_DIR}\\n")
     - `ADAPTER_DIR`: where LoRA adapter + tokenizer are saved (e.g. `output/lora_math`).
 - **What it does**:
   1. **Load base model + tokenizer** via `download_qwen_25_07b`.
-  2. **Load data**:
-     - Multi-dataset: `load_multi_math_dataset(max_per_dataset=MAX_PER_DATASET)` → normalized `question` / `answer`.
-     - Single dataset: `load_and_tokenize_math(...)` on e.g. GSM8K.
-  3. **Tokenize** with Qwen chat template using `tokenize_math_dataset`:
-     - Creates `input_ids`, `attention_mask`, `labels` with loss only on the assistant part.
-  4. **Wrap with LoRA**:
+  2. **Load + tokenize** via `load_and_tokenize_math(...)` (GSM8K chat format, label masking on assistant only).
+  3. **Wrap with LoRA**:
      - `create_lora_model(model, r=LORA_R, lora_alpha=LORA_ALPHA, use_4bit_or_8bit=LOAD_IN_4BIT)`.
-  5. **Train** with `run_finetune`:
+  4. **Train** with `run_finetune`:
      - Uses `TrainingArguments` under the hood with computed `warmup_steps` (no deprecated `warmup_ratio`).
      - Uses a `DataCollatorForLanguageModeling` built from the tokenizer.
-  6. **Save artifacts**:
+  5. **Save artifacts**:
      - `trainer.save_model(ADAPTER_DIR)`.
      - `tokenizer.save_pretrained(ADAPTER_DIR)`.
 - **Matches**:
   - Same logic as `train_and_save` in `main.py`, but unwrapped and split into explicit steps in the cell.
 - **Expected output**:
   - A line like:
-    - `Multi-dataset training: 400 samples (up to 100 per dataset), 2 epoch(s).`
+    - `GSM8K training: 100 samples (up to 100 samples), 2 epoch(s).`
   - Training progress bar/logs from `transformers.Trainer`.
   - Final line:
     - `Train done. Adapter + tokenizer saved to: output/lora_math`
@@ -184,74 +167,36 @@ print(f"Train done. Adapter + tokenizer saved to: {ADAPTER_DIR}\\n")
 
 ### Cell 4 – Inference
 
+Loads `openai/gsm8k` (`main` config), samples **`INFERENCE_NUM_QUESTIONS`** random rows from **`INFERENCE_QUESTION_SPLIT`** (default `test`), and runs the same chat + RAG generation for each. User text matches training:  
+`Solve the following math problem step by step.\n\n{question}`.
+
 ```python
-from hyperparameters import ADAPTER_DIR, INFERENCE_QUERY, LOAD_IN_4BIT_INFERENCE, MAX_NEW_TOKENS
-
-adapter_path = Path(ADAPTER_DIR)
-with open(adapter_path / "adapter_config.json") as f:
-    base_model_id = json.load(f).get("base_model_name_or_path", "Qwen/Qwen2.5-0.5B-Instruct")
-
-tokenizer = AutoTokenizer.from_pretrained(str(adapter_path), trust_remote_code=True)
-base_kwargs = dict(device_map="auto", trust_remote_code=True)
-if LOAD_IN_4BIT_INFERENCE:
-    base_kwargs["quantization_config"] = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_compute_dtype=torch.bfloat16,
-        bnb_4bit_quant_type="nf4",
-    )
-else:
-    base_kwargs["torch_dtype"] = "auto"
-
-base_model = AutoModelForCausalLM.from_pretrained(base_model_id, **base_kwargs)
-model = PeftModel.from_pretrained(base_model, str(adapter_path))
-model.eval()
-
-rag = RAGCalculatorLayer(SafeEvalCalculatorClient())
-messages = [{"role": "user", "content": INFERENCE_QUERY}]
-prompt = tokenizer.apply_chat_template(
-    messages,
-    tokenize=False,
-    add_generation_prompt=True,
+import random
+from datasets import load_dataset
+from hyperparameters import (
+    ADAPTER_DIR,
+    INFERENCE_NUM_QUESTIONS,
+    INFERENCE_QUESTION_SPLIT,
+    INFERENCE_RANDOM_SEED,
+    LOAD_IN_4BIT_INFERENCE,
+    MAX_NEW_TOKENS,
 )
-answer = rag.generate_with_rag(model, tokenizer, prompt, max_new_tokens=MAX_NEW_TOKENS)
-
-print(f"Inference query: {INFERENCE_QUERY}")
-print(f"Inference answer: {answer}\\n")
+# ... load adapter, base model, PeftModel, rag ...
+raw = load_dataset("openai/gsm8k", "main", split=INFERENCE_QUESTION_SPLIT)
+rng = random.Random(INFERENCE_RANDOM_SEED)
+indices = rng.sample(range(len(raw)), min(INFERENCE_NUM_QUESTIONS, len(raw)))
+for i, idx in enumerate(indices, start=1):
+    question = raw[idx]["question"]
+    user_content = f"Solve the following math problem step by step.\n\n{question}"
+    # apply_chat_template → generate_with_rag → print question + answer
 ```
 
 - **Hyperparameters used**:
-  - `ADAPTER_DIR`: directory produced by training cell.
-  - `INFERENCE_QUERY`: the user query for inference; can contain `[CALC: ...]`.
-  - `LOAD_IN_4BIT_INFERENCE`: whether to load base model in 4-bit for inference.
-  - `MAX_NEW_TOKENS`: cap on generated tokens for the answer.
-- **What it does**:
-  1. **Resolve base model ID**:
-     - Reads `adapter_config.json` from `ADAPTER_DIR` and gets `base_model_name_or_path`, defaulting to `"Qwen/Qwen2.5-0.5B-Instruct"`.
-  2. **Load tokenizer**:
-     - From `ADAPTER_DIR` so it matches the fine-tuned model.
-  3. **Load base+LoRA model**:
-     - `AutoModelForCausalLM.from_pretrained(base_model_id, **base_kwargs)`.
-     - Wrap with `PeftModel.from_pretrained(base_model, ADAPTER_DIR)`.
-     - `model.eval()` for inference.
-  4. **Build RAG layer**:
-     - `RAGCalculatorLayer(SafeEvalCalculatorClient())` – uses real calculator.
-  5. **Build chat prompt**:
-     - `tokenizer.apply_chat_template([...], add_generation_prompt=True)` to format user query for Qwen chat.
-  6. **Generate with RAG**:
-     - `rag.generate_with_rag(model, tokenizer, prompt, max_new_tokens=MAX_NEW_TOKENS)`.
-     - Internally:
-       - Calls `model.generate(...)` with safe generation kwargs (only adds `temperature` / `top_p` if supported by the model’s `generation_config`).
-       - Scans output for `[CALC: ...]`, calls calculator, and replaces placeholders.
-  7. **Print result**:
-     - Echoes `INFERENCE_QUERY`.
-     - Prints the full final answer string.
-- **Matches**:
-  - Same overall behavior as `load_for_inference + run_inference + inference_with_rag` in `main.py`.
-- **Expected output** (example):
-  - Query:
-    - `Inference query: What is [CALC: 7*8]?`
-  - Answer:
-    - A full Qwen chat-style response where the calculator has already replaced `[CALC: 7*8]` with `56` and the model explains the result.
+  - `ADAPTER_DIR`, `LOAD_IN_4BIT_INFERENCE`, `MAX_NEW_TOKENS` (as before).
+  - `INFERENCE_NUM_QUESTIONS` (default 5), `INFERENCE_RANDOM_SEED` (reproducible samples), `INFERENCE_QUESTION_SPLIT` (`train` or `test`; default `test` to avoid overlap with training on `train`).
+  - `INFERENCE_QUERY` in `hyperparameters.py` is optional for one-off manual tests; the notebook does not use it for this cell.
+- **Expected output**:
+  - Five blocks like `--- [1/5] (GSM8K test index <idx>) ---`, each with a **Question** and **Answer** line.
 
 ---
 
@@ -260,12 +205,12 @@ print(f"Inference answer: {answer}\\n")
 - **RAG test only**:
   - Run **Cell 1** (imports) → **Cell 2** (RAG test).
 - **Train only**:
-  - Adjust hyperparameters in `hyperparameters.py` if needed (e.g. `MAX_PER_DATASET`, `NUM_EPOCHS`).
+  - Adjust hyperparameters in `hyperparameters.py` if needed (e.g. `MAX_TRAIN_SAMPLES`, `NUM_EPOCHS`).
   - Run **Cell 1** → **Cell 3**.
 - **Inference only (using existing adapter)**:
   - Ensure `ADAPTER_DIR` already exists from a previous run.
-  - Set `INFERENCE_QUERY` in `hyperparameters.py`.
-  - Run **Cell 1** → **Cell 4**.
+  - Optional: tune `INFERENCE_NUM_QUESTIONS`, `INFERENCE_RANDOM_SEED`, `INFERENCE_QUESTION_SPLIT` in `hyperparameters.py`.
+  - Run **Cell 1** → **Cell 4** (inference).
 - **Full pipeline in notebook**:
   - Run **Cell 1** → **Cell 2** → **Cell 3** → **Cell 4**.
 

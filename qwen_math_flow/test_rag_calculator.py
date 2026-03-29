@@ -1,5 +1,5 @@
-from rag_calculator import RAGCalculatorLayer
-from external_calculator import SafeEvalCalculatorClient
+from .rag_calculator import RAGCalculatorLayer
+from .external_calculator import SafeEvalCalculatorClient
 
 # Create calculator
 calculator = SafeEvalCalculatorClient()

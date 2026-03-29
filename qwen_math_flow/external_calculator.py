@@ -38,6 +38,32 @@ class StubCalculatorClient(CalculatorClient):
         return True
 
 
+def _safe_eval_allowed_nodes() -> tuple:
+    """Node types allowed in calculator expressions (Python 3.8+ uses ast.Constant; ast.Num removed in 3.14+)."""
+    nodes = [
+        ast.Expression,
+        ast.BinOp,
+        ast.UnaryOp,
+        ast.Constant,
+        ast.Call,
+        ast.Load,
+        ast.Name,
+        ast.Add,
+        ast.Sub,
+        ast.Mult,
+        ast.Div,
+        ast.Pow,
+        ast.Mod,
+        ast.FloorDiv,
+        ast.USub,
+        ast.UAdd,
+    ]
+    # Legacy numeric literals (deprecated; not present on some Python versions)
+    if hasattr(ast, "Num"):
+        nodes.append(ast.Num)
+    return tuple(nodes)
+
+
 class SafeEvalCalculatorClient(CalculatorClient):
     """
     Secure evaluator for math expressions.
@@ -58,24 +84,7 @@ class SafeEvalCalculatorClient(CalculatorClient):
         "pow": pow,
     })
 
-    ALLOWED_NODES = (
-        ast.Expression,
-        ast.BinOp,
-        ast.UnaryOp,
-        ast.Num,
-        ast.Call,
-        ast.Load,
-        ast.Name,
-        ast.Add,
-        ast.Sub,
-        ast.Mult,
-        ast.Div,
-        ast.Pow,
-        ast.Mod,
-        ast.FloorDiv,
-        ast.USub,
-        ast.UAdd,
-    )
+    ALLOWED_NODES = _safe_eval_allowed_nodes()
 
     def is_available(self) -> bool:
         return True
@@ -99,6 +108,11 @@ class SafeEvalCalculatorClient(CalculatorClient):
         for subnode in ast.walk(node):
             if not isinstance(subnode, self.ALLOWED_NODES):
                 return False
+
+            if isinstance(subnode, ast.Constant):
+                # Only numeric constants (bool is int subclass in Python)
+                if not isinstance(subnode.value, (int, float, complex)):
+                    return False
 
             if isinstance(subnode, ast.Name):
                 if subnode.id not in self.ALLOWED_NAMES:

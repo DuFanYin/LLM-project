@@ -9,7 +9,7 @@ RAG layer that augments model outputs with calculator calls.
 import re
 from typing import Any, Callable, List, Optional, Tuple
 
-from external_calculator import CalculatorClient
+from .external_calculator import CalculatorClient
 
 
 class RAGCalculatorLayer:

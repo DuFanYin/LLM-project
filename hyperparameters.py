@@ -15,22 +15,14 @@ RUN_STEP = "train_save"
 ADAPTER_DIR = "output/lora_math"
 
 # -----------------------------------------------------------------------------
-# Training — single-dataset (used when USE_MULTI_DATASET is False)
+# Training — GSM8K only (openai/gsm8k, subset main)
 # -----------------------------------------------------------------------------
-# Supported: e.g. "openai/gsm8k", "gsm8k"
+# Supported: e.g. "openai/gsm8k"
 DATASET_NAME = "openai/gsm8k"
 # Supported: "train" | "test" | "validation"
 DATASET_SPLIT = "train"
 # Supported: int (cap) or None (full split)
-MAX_TRAIN_SAMPLES: Optional[int] = 20
-
-# -----------------------------------------------------------------------------
-# Training — multi-dataset
-# -----------------------------------------------------------------------------
-# Supported: True = 4-dataset mix (GSM8K+ASDiv+MetaMathQA+OpenMathInstruct); False = single dataset only
-USE_MULTI_DATASET = True
-# Supported: int (e.g. 100 for testing) or None (full dataset per source)
-MAX_PER_DATASET: Optional[int] = 100  # 4 datasets × 100 = 400 samples total
+MAX_TRAIN_SAMPLES: Optional[int] = 100
 
 # -----------------------------------------------------------------------------
 # Training — optimizer / schedule
@@ -63,12 +55,17 @@ MODEL_CACHE_DIR: Optional[str] = None
 # -----------------------------------------------------------------------------
 # Inference
 # -----------------------------------------------------------------------------
-# Supported: any string (use [CALC: expr] for calculator)
+# Optional fixed query (e.g. quick manual test). Main notebook samples from GSM8K instead.
 INFERENCE_QUERY = "What is [CALC: 7*8]?"
 # Supported: int
 MAX_NEW_TOKENS = 128
 # Supported: True | False
 LOAD_IN_4BIT_INFERENCE = False
+# Random questions from GSM8K (openai/gsm8k, subset main) — used by Main.ipynb inference cell
+INFERENCE_NUM_QUESTIONS = 5
+INFERENCE_RANDOM_SEED = 42
+# Supported: "train" | "test" (test avoids overlap with typical training on train)
+INFERENCE_QUESTION_SPLIT = "test"
 
 # -----------------------------------------------------------------------------
 # RAG test
