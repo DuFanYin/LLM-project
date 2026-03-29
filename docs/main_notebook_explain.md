@@ -194,7 +194,6 @@ for i, idx in enumerate(indices, start=1):
 - **Hyperparameters used**:
   - `ADAPTER_DIR`, `LOAD_IN_4BIT_INFERENCE`, `MAX_NEW_TOKENS` (as before).
   - `INFERENCE_NUM_QUESTIONS` (default 5), `INFERENCE_RANDOM_SEED` (reproducible samples), `INFERENCE_QUESTION_SPLIT` (`train` or `test`; default `test` to avoid overlap with training on `train`).
-  - `INFERENCE_QUERY` in `hyperparameters.py` is optional for one-off manual tests; the notebook does not use it for this cell.
 - **Expected output**:
   - Five blocks like `--- [1/5] (GSM8K test index <idx>) ---`, each with a **Question** and **Answer** line.
 

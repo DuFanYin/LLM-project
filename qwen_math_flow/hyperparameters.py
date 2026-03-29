@@ -6,11 +6,8 @@ Edit this file to switch behaviour (no CLI arguments).
 from typing import Optional
 
 # -----------------------------------------------------------------------------
-# Run control
+# Paths
 # -----------------------------------------------------------------------------
-# Supported: "rag_test" | "train_save" | "inference" | "all"
-RUN_STEP = "train_save"
-
 # Supported: any path string
 ADAPTER_DIR = "output/lora_math"
 
@@ -55,8 +52,6 @@ MODEL_CACHE_DIR: Optional[str] = None
 # -----------------------------------------------------------------------------
 # Inference
 # -----------------------------------------------------------------------------
-# Optional fixed query (e.g. quick manual test). Main notebook samples from GSM8K instead.
-INFERENCE_QUERY = "What is [CALC: 7*8]?"
 # Supported: int
 MAX_NEW_TOKENS = 128
 # Supported: True | False
