@@ -19,7 +19,7 @@ DATASET_NAME = "openai/gsm8k"
 # Supported: "train" | "test" | "validation"
 DATASET_SPLIT = "train"
 # Supported: int (cap) or None (full split)
-MAX_TRAIN_SAMPLES: Optional[int] = 100
+MAX_TRAIN_SAMPLES: Optional[int] = None
 
 # -----------------------------------------------------------------------------
 # Training — optimizer / schedule

@@ -20,15 +20,6 @@ env/
 # OS
 .DS_Store
 
-# Training artifacts (LoRA weights, checkpoints, tokenizers saved with training)
-output/
-
-# Generated output dumps (regenerate locally)
-*_outputs.json
-math_outputs.json
-all_datasets_output.json
-gsm8k_outputs.json
-
 # Secrets / local config
 .env
 .env.*

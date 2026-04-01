@@ -5,11 +5,52 @@ Handles tokenized datasets with input_ids, attention_mask, labels.
 Optional 4-bit/8-bit base model support via prepare_model_for_kbit_training.
 """
 
+import json
+import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
-from transformers import DataCollatorForLanguageModeling, Trainer, TrainingArguments
+from transformers import DataCollatorForLanguageModeling, Trainer, TrainerCallback, TrainingArguments
+
+logger = logging.getLogger(__name__)
+
+
+class LossConvergenceCallback(TrainerCallback):
+    """Stop training early when the training loss stops improving.
+
+    Tracks loss over a sliding window of `window` log events. Stops if the
+    improvement from the oldest to the newest value in the window is below
+    `min_delta`.
+
+    Args:
+        window: Number of consecutive log events to compare (default 5).
+        min_delta: Minimum absolute improvement required to continue (default 0.01).
+    """
+
+    def __init__(self, window: int = 5, min_delta: float = 0.01):
+        self.window = window
+        self.min_delta = min_delta
+        self._loss_history: List[float] = []
+
+    def on_log(self, args, state, control, logs=None, **kwargs):
+        if not logs or logs.get("loss") is None:
+            return
+        self._loss_history.append(logs["loss"])
+        if len(self._loss_history) >= self.window:
+            oldest = self._loss_history[-self.window]
+            newest = self._loss_history[-1]
+            improvement = oldest - newest
+            if improvement < self.min_delta:
+                logger.info(
+                    "LossConvergenceCallback: loss converged (improvement=%.4f < min_delta=%.4f) "
+                    "over last %d log events — stopping early at step %d.",
+                    improvement,
+                    self.min_delta,
+                    self.window,
+                    state.global_step,
+                )
+                control.should_training_stop = True
 
 
 def create_lora_model(
@@ -53,6 +94,10 @@ def create_lora_model(
         task_type=task_type,
     )
     peft_model = get_peft_model(model, config)
+    # Gradient checkpointing reduces VRAM by recomputing activations on the backward
+    # pass instead of storing them. Requires input_requires_grad=True for PEFT models.
+    peft_model.enable_input_require_grads()
+    peft_model.gradient_checkpointing_enable()
     return peft_model
 
 
@@ -87,9 +132,12 @@ def run_finetune(
     bf16: bool = True,
     fp16: bool = False,
     report_to: str = "none",
-    dataloader_pin_memory: bool = False,
+    dataloader_pin_memory: bool = True,
+    dataloader_num_workers: int = 4,
+    callbacks: Optional[List[Any]] = None,
+    save_log_history_json: bool = False,
     **training_kwargs: Any,
-) -> Dict[str, float]:
+) -> Dict[str, Any]:
     """
     Run LoRA fine-tuning with the Trainer API.
 
@@ -114,11 +162,22 @@ def run_finetune(
         max_steps: Max training steps (-1 = use num_epochs).
         bf16 / fp16: Mixed precision.
         report_to: "none", "wandb", "tensorboard", etc.
-        **training_kwargs: Passed to Trainer (e.g. callbacks).
+        callbacks: Optional list of `TrainerCallback` instances (e.g. progress logging in notebooks).
+        save_log_history_json: If True, write `trainer_log_history.json` under `output_dir`.
+        **training_kwargs: Extra keys for `TrainingArguments` (e.g. `logging_first_step`, `logging_strategy`).
 
     Returns:
-        Trainer state / metrics (trainer.state.log_history, etc.).
+        Dict with log_history, train_loss, global_step, epoch, and optionally paths.
     """
+    training_kwargs = dict(training_kwargs)
+    # Backward compat: allow these in **kwargs without passing invalid keys to TrainingArguments
+    save_log_history_json = bool(
+        training_kwargs.pop("save_log_history_json", save_log_history_json)
+    )
+    extra_callbacks = training_kwargs.pop("callbacks", None)
+    if extra_callbacks is not None:
+        callbacks = list(callbacks or []) + list(extra_callbacks)
+
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
@@ -152,6 +211,8 @@ def run_finetune(
         report_to=report_to,
         remove_unused_columns=False,
         dataloader_pin_memory=dataloader_pin_memory,
+        dataloader_num_workers=dataloader_num_workers,
+        optim="adamw_torch_fused",
         **{k: v for k, v in training_kwargs.items() if k not in ("model", "args", "train_dataset", "eval_dataset", "data_collator", "tokenizer")},
     )
 
@@ -163,12 +224,24 @@ def run_finetune(
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         data_collator=data_collator,
+        callbacks=callbacks,
     )
     trainer.train()
     trainer.save_model(str(output_path))
     tokenizer.save_pretrained(str(output_path))
 
-    return {
-        "log_history": trainer.state.log_history,
-        "train_loss": trainer.state.log_history[-1].get("loss", None) if trainer.state.log_history else None,
+    log_history = trainer.state.log_history
+    last = log_history[-1] if log_history else {}
+    result: Dict[str, Any] = {
+        "log_history": log_history,
+        "train_loss": last.get("loss"),
+        "global_step": trainer.state.global_step,
+        "epoch": trainer.state.epoch,
     }
+    if save_log_history_json:
+        hist_path = output_path / "trainer_log_history.json"
+        with open(hist_path, "w", encoding="utf-8") as f:
+            json.dump(log_history, f, indent=2)
+        result["trainer_log_history_path"] = str(hist_path.resolve())
+
+    return result
