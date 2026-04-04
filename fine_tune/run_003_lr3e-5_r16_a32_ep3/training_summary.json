@@ -1,0 +1,46 @@
+{
+  "run_index": 3,
+  "run_hyperparameter_sweep": true,
+  "sweep_overrides": {
+    "learning_rate": 3e-05,
+    "lora_r": 16,
+    "lora_alpha": 32,
+    "num_epochs": 3
+  },
+  "merged_params": {
+    "learning_rate": 3e-05,
+    "lora_r": 16,
+    "lora_alpha": 32,
+    "num_epochs": 3,
+    "per_device_train_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "max_length": 512,
+    "max_train_samples": null
+  },
+  "finished_at_utc": "2026-04-02T13:56:10.005616+00:00",
+  "output_dir": "/common/home/users/c/chinyee.lew.2022/output/fine_tune/run_003_lr3e-5_r16_a32_ep3",
+  "log_files": {
+    "training_run_log": "/common/home/users/c/chinyee.lew.2022/output/fine_tune/run_003_lr3e-5_r16_a32_ep3/training_run.log",
+    "trainer_log_history_json": "/common/home/users/c/chinyee.lew.2022/output/fine_tune/run_003_lr3e-5_r16_a32_ep3/trainer_log_history.json"
+  },
+  "logging_steps": 1,
+  "show_notebook_log_lines": true,
+  "disable_tqdm": false,
+  "transformers_debug": false,
+  "early_stop_window": 20,
+  "early_stop_min_delta": 0.005,
+  "dataset": "openai/gsm8k",
+  "split": "train",
+  "num_train_samples": 7473,
+  "num_epochs": 3,
+  "per_device_train_batch_size": 4,
+  "gradient_accumulation_steps": 4,
+  "learning_rate": 3e-05,
+  "max_length": 512,
+  "lora_r": 16,
+  "lora_alpha": 32,
+  "load_in_4bit": false,
+  "final_train_loss": null,
+  "global_step": 20,
+  "epoch": 0.042803638309256285
+}
