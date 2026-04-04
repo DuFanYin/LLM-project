@@ -1,7 +1,5 @@
 """
-Download Qwen2.5 0.5B/0.7B from Hugging Face and optionally cache locally.
-
-Uses Qwen2.5-0.5B-Instruct (smallest available on HF; no 0.7B exists).
+Download a Qwen causal LM from Hugging Face and optionally cache locally.
 """
 
 from pathlib import Path
@@ -12,6 +10,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
 
 def download_qwen_25_07b(
+    model_id: str = "Qwen/Qwen2-1.5B",
     cache_dir: Optional[str] = None,
     revision: str = "main",
     trust_remote_code: bool = True,
@@ -23,11 +22,10 @@ def download_qwen_25_07b(
     bnb_4bit_quant_type: str = "nf4",
 ) -> Tuple[Any, Any]:
     """
-    Download Qwen2.5 small instruct model and tokenizer from Hugging Face.
-
-    Model: Qwen/Qwen2.5-0.5B-Instruct (HF does not publish 0.7B; 0.5B is smallest).
+    Download a Qwen model and tokenizer from Hugging Face.
 
     Args:
+        model_id: Hugging Face model repo id (for example "Qwen/Qwen2-1.5B").
         cache_dir: Directory to cache model weights. If None, uses HF default.
         revision: Git revision (branch/tag) of the model repo.
         trust_remote_code: Allow custom modeling code from the hub.
@@ -41,7 +39,6 @@ def download_qwen_25_07b(
     Returns:
         Tuple of (model, tokenizer).
     """
-    model_id = "Qwen/Qwen2.5-0.5B-Instruct"
     cache_path = Path(cache_dir) if cache_dir else None
     dtype = torch_dtype if torch_dtype is not None else "auto"
 
