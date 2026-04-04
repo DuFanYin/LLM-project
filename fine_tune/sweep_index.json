@@ -1,54 +1,14 @@
 {
-  "finished_at_utc": "2026-04-02T13:56:37.074987+00:00",
-  "num_runs": 5,
+  "finished_at_utc": "2026-04-04T05:15:32.975819+00:00",
+  "num_runs": 18,
+  "num_skipped": 16,
+  "num_executed": 2,
   "runs": [
     {
-      "output_dir": "/common/home/users/c/chinyee.lew.2022/output/fine_tune/run_000_lr1e-5_r8_a16_ep1",
+      "output_dir": "/common/home/users/c/chinyee.lew.2022/output/fine_tune/run_016_lr1e-4_r16_a32_ep3",
       "final_train_loss": null,
       "merged_params": {
-        "learning_rate": 1e-05,
-        "lora_r": 8,
-        "lora_alpha": 16,
-        "num_epochs": 1,
-        "per_device_train_batch_size": 4,
-        "gradient_accumulation_steps": 4,
-        "max_length": 512,
-        "max_train_samples": null
-      }
-    },
-    {
-      "output_dir": "/common/home/users/c/chinyee.lew.2022/output/fine_tune/run_001_lr2e-5_r8_a16_ep2",
-      "final_train_loss": null,
-      "merged_params": {
-        "learning_rate": 2e-05,
-        "lora_r": 8,
-        "lora_alpha": 16,
-        "num_epochs": 2,
-        "per_device_train_batch_size": 4,
-        "gradient_accumulation_steps": 4,
-        "max_length": 512,
-        "max_train_samples": null
-      }
-    },
-    {
-      "output_dir": "/common/home/users/c/chinyee.lew.2022/output/fine_tune/run_002_lr2e-5_r16_a32_ep2",
-      "final_train_loss": null,
-      "merged_params": {
-        "learning_rate": 2e-05,
-        "lora_r": 16,
-        "lora_alpha": 32,
-        "num_epochs": 2,
-        "per_device_train_batch_size": 4,
-        "gradient_accumulation_steps": 4,
-        "max_length": 512,
-        "max_train_samples": null
-      }
-    },
-    {
-      "output_dir": "/common/home/users/c/chinyee.lew.2022/output/fine_tune/run_003_lr3e-5_r16_a32_ep3",
-      "final_train_loss": null,
-      "merged_params": {
-        "learning_rate": 3e-05,
+        "learning_rate": 0.0001,
         "lora_r": 16,
         "lora_alpha": 32,
         "num_epochs": 3,
@@ -59,10 +19,10 @@
       }
     },
     {
-      "output_dir": "/common/home/users/c/chinyee.lew.2022/output/fine_tune/run_004_lr3e-5_r32_a64_ep3",
+      "output_dir": "/common/home/users/c/chinyee.lew.2022/output/fine_tune/run_017_lr1e-4_r32_a64_ep3",
       "final_train_loss": null,
       "merged_params": {
-        "learning_rate": 3e-05,
+        "learning_rate": 0.0001,
         "lora_r": 32,
         "lora_alpha": 64,
         "num_epochs": 3,
