@@ -1,0 +1,12 @@
+{
+  "num_examples": 245,
+  "filter": "len(answer) > 404 on gsm8k test split",
+  "num_attempts": 2,
+  "temperature": 0.7,
+  "accuracy": 0.13673469387755102,
+  "avg_input_tokens": 257.38775510204084,
+  "avg_output_tokens": 289.52244897959184,
+  "consistency_score": 0.08571428571428572,
+  "total_runtime_sec": 6832.584407567978,
+  "avg_runtime_sec": 27.88809962272644
+}
