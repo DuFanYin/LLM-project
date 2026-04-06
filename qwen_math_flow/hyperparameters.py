@@ -9,7 +9,7 @@ from typing import Optional
 # Paths
 # -----------------------------------------------------------------------------
 # Supported: any path string
-ADAPTER_DIR = "output/lora_math"
+ADAPTER_DIR = "output/fine_tune/run_004_lr1e-4_r32_a64_ep3"
 
 # -----------------------------------------------------------------------------
 # Training — GSM8K only (openai/gsm8k, subset main)

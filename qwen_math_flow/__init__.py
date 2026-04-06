@@ -1,12 +1,14 @@
 """
-Qwen2.5 math flow: download -> dataset -> LoRA fine-tune -> RAG calculator.
+Qwen math flow: download -> LoRA fine-tune -> optional RAG calculator.
 """
 
-from .download_model import download_qwen_25_07b
+from .download_model import download_qwen_2_15b
 from .load_dataset import (
+    build_deterministic_math_prompt,
+    format_gsm8k_as_deterministic_json_chat,
+    format_gsm8k_as_chat,
     load_math_dataset,
     load_and_tokenize_math,
-    format_gsm8k_as_chat,
     format_math_as_chat,
     tokenize_math_dataset,
 )
@@ -15,7 +17,9 @@ from .rag_calculator import RAGCalculatorLayer
 from .external_calculator import CalculatorClient, StubCalculatorClient, SafeEvalCalculatorClient
 
 __all__ = [
-    "download_qwen_25_07b",
+    "download_qwen_2_15b",
+    "build_deterministic_math_prompt",
+    "format_gsm8k_as_deterministic_json_chat",
     "load_math_dataset",
     "load_and_tokenize_math",
     "format_gsm8k_as_chat",
