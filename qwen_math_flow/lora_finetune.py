@@ -1,5 +1,5 @@
 """
-Add LoRA to Qwen2.5 and run fine-tuning on the math dataset.
+Add LoRA to Qwen2-1.5B and run fine-tuning on the math dataset.
 
 Handles tokenized datasets with input_ids, attention_mask, labels.
 Optional 4-bit/8-bit base model support via prepare_model_for_kbit_training.
@@ -234,7 +234,7 @@ def run_finetune(
     last = log_history[-1] if log_history else {}
     result: Dict[str, Any] = {
         "log_history": log_history,
-        "train_loss": last.get("loss"),
+        "train_loss": last.get("train_loss", last.get("loss")),
         "global_step": trainer.state.global_step,
         "epoch": trainer.state.epoch,
     }

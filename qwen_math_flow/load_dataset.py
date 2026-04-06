@@ -5,6 +5,8 @@ Supports Qwen chat format and label masking (train only on assistant responses).
 Math data loading uses GSM8K (train split) by default.
 """
 
+import json
+import re
 from typing import Any, Callable, Dict, List, Optional, Union
 
 from datasets import Dataset, concatenate_datasets, load_dataset as hf_load
@@ -123,6 +125,56 @@ def load_math_dataset(
 # ---------------------------------------------------------------------------
 
 
+DETERMINISTIC_MATH_JSON_PROMPT = """You are a deterministic mathematics reasoning engine.
+
+Solve the following math problem step by step.
+1. Analyze the problem and identify key values.
+2. Compute sequentially, showing all intermediate steps.
+3. Verify your final calculation before concluding.
+
+CRITICAL OUTPUT RULES:
+- Return ONLY a valid JSON object.
+- Do NOT use markdown, code blocks, or backticks.
+- Do NOT include any text, greetings, or explanations outside the JSON.
+- Do NOT repeat the question or include ####.
+- "model_reasoning": Clear step-by-step logic. Avoid using curly braces {{}} in the text to prevent JSON parsing errors.
+- "model_answer": Final numeric value ONLY (e.g., 42, 15.5). No units, words, or symbols.
+
+Required JSON Format:
+{{
+  "model_reasoning": "...",
+  "model_answer": "..."
+}}
+
+Problem:
+{question}
+"""
+
+
+def build_deterministic_math_prompt(question: str) -> str:
+    """Build the exact user prompt used for JSON-formatted math fine-tuning."""
+    return DETERMINISTIC_MATH_JSON_PROMPT.format(question=question)
+
+
+def _extract_gsm8k_reasoning_and_answer(answer: str) -> Dict[str, str]:
+    """Split GSM8K's `reasoning #### final` format into JSON-friendly fields."""
+    raw = (answer or "").strip()
+    if "####" in raw:
+        reasoning_part, answer_part = raw.rsplit("####", 1)
+    else:
+        reasoning_part, answer_part = raw, raw
+
+    reasoning_text = reasoning_part.strip().replace("{", "(").replace("}", ")")
+    answer_text = answer_part.strip().replace(",", "")
+    matches = re.findall(r"-?\d+(?:\.\d+)?", answer_text)
+    final_answer = matches[-1] if matches else answer_text
+
+    return {
+        "model_reasoning": reasoning_text,
+        "model_answer": final_answer,
+    }
+
+
 def format_gsm8k_as_chat(sample: Dict[str, Any]) -> List[Dict[str, str]]:
     """
     Format one GSM8K example as Qwen chat messages: user = question, assistant = answer.
@@ -135,12 +187,28 @@ def format_gsm8k_as_chat(sample: Dict[str, Any]) -> List[Dict[str, str]]:
     ]
 
 
-def format_multi_math_as_chat(sample: Dict[str, Any]) -> List[Dict[str, str]]:
+def format_gsm8k_as_deterministic_json_chat(sample: Dict[str, Any]) -> List[Dict[str, str]]:
     """
-    Format a sample with keys question/answer (e.g. from load_multi_math_dataset) as Qwen chat.
-    Same instruction style as format_gsm8k_as_chat for consistency.
+    Format one GSM8K example with the deterministic JSON prompt and JSON target.
     """
-    return format_gsm8k_as_chat(sample)
+    question = sample.get("question", "")
+    answer = sample.get("answer", "")
+    assistant_payload = _extract_gsm8k_reasoning_and_answer(answer)
+    return [
+        {"role": "user", "content": build_deterministic_math_prompt(question)},
+        {
+            "role": "assistant",
+            "content": json.dumps(assistant_payload, ensure_ascii=False),
+        },
+    ]
+
+
+# def format_multi_math_as_chat(sample: Dict[str, Any]) -> List[Dict[str, str]]:
+#     """
+#     Format a sample with keys question/answer (e.g. from load_multi_math_dataset) as Qwen chat.
+#     Same instruction style as format_gsm8k_as_chat for consistency.
+#     """
+#     return format_gsm8k_as_chat(sample)
 
 
 def format_math_as_chat(
