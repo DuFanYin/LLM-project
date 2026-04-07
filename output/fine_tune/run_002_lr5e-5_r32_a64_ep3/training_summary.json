@@ -1,0 +1,45 @@
+{
+  "run_index": 2,
+  "run_hyperparameter_sweep": true,
+  "sweep_overrides": {
+    "learning_rate": 5e-05,
+    "lora_r": 32,
+    "lora_alpha": 64,
+    "num_epochs": 3,
+    "max_train_samples": null
+  },
+  "merged_params": {
+    "learning_rate": 5e-05,
+    "lora_r": 32,
+    "lora_alpha": 64,
+    "num_epochs": 3,
+    "per_device_train_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "max_length": 512,
+    "max_train_samples": null
+  },
+  "finished_at_utc": "2026-04-05T19:48:43.059507+00:00",
+  "output_dir": "C:\\Users\\Admin\\Desktop\\smu\\LLM-project\\output\\fine_tune\\run_002_lr5e-5_r32_a64_ep3",
+  "log_files": {
+    "training_run_log": "C:\\Users\\Admin\\Desktop\\smu\\LLM-project\\output\\fine_tune\\run_002_lr5e-5_r32_a64_ep3\\training_run.log",
+    "trainer_log_history_json": "C:\\Users\\Admin\\Desktop\\smu\\LLM-project\\output\\fine_tune\\run_002_lr5e-5_r32_a64_ep3\\trainer_log_history.json"
+  },
+  "logging_steps": 1,
+  "show_notebook_log_lines": true,
+  "disable_tqdm": false,
+  "transformers_debug": false,
+  "dataset": "openai/gsm8k",
+  "split": "train",
+  "num_train_samples": 7473,
+  "num_epochs": 3,
+  "per_device_train_batch_size": 4,
+  "gradient_accumulation_steps": 4,
+  "learning_rate": 5e-05,
+  "max_length": 512,
+  "lora_r": 32,
+  "lora_alpha": 64,
+  "load_in_4bit": false,
+  "final_train_loss": null,
+  "global_step": 1404,
+  "epoch": 3.0
+}
