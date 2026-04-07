@@ -1,98 +1,72 @@
-# LLM-project
+# LLM Project - G1 Group 9
 
-Fine-tune **Qwen2.5-0.5B-Instruct** on GSM8K math with **LoRA**, then run inference augmented by a **RAG calculator layer** that evaluates arithmetic expressions the model emits (e.g. `[CALC: 12*7]`).
+This repository contains our experiments on math reasoning with `Qwen/Qwen2-1.5B` and the GSM8K dataset. The repo contains three main tracks: a baseline benchmark, LoRA fine-tuning, and our reinforcement learning experiments, plus the saved outputs from our experiments. 
 
----
+## Quick Start
 
-## Project structure
-
-```
-LLM-project/
-├── FineTune.ipynb              # LoRA fine-tuning — sweep, early stopping, artifacts
-├── Main.ipynb                  # Inference pipeline — load adapter, RAG, evaluate
-├── qwen_math_flow/
-│   ├── hyperparameters.py      # All training/inference knobs
-│   ├── download_model.py       # Qwen2.5 model + tokenizer loader (optional 4-bit)
-│   ├── load_dataset.py         # GSM8K load, chat formatting, tokenization
-│   ├── lora_finetune.py        # LoRA setup, Trainer config, LossConvergenceCallback
-│   ├── rag_calculator.py       # Extract [CALC:…] → evaluate → inject result
-│   ├── external_calculator.py  # CalculatorClient, SafeEval, Stub implementations
-│   └── test_rag_calculator.py  # Unit tests for RAG / calculator
-├── results.json                # Baseline inference results (10 examples, 10% EM)
-├── daniil_results1.json        # Baseline inference results (100 examples, 21% EM)
-├── README_finetune.md          # Fine-tuning design, rationale, metrics
-├── docs/
-│   ├── REPO_STRUCTURE.md
-│   └── main_notebook_explain.md
-├── requirements.txt
-└── output/                     # (gitignored) all generated artifacts
-    ├── fine_tune/              # FineTune.ipynb outputs — one subfolder per sweep run
-    │   └── run_NNN_lr…_rN_aN_epN/
-    │       ├── adapter_model.safetensors
-    │       ├── adapter_config.json
-    │       ├── tokenizer.json / tokenizer_config.json
-    │       ├── training_summary.json
-    │       ├── trainer_log_history.json
-    │       ├── training_run.log
-    │       └── checkpoint-{step}/
-    ├── sweep_index.json        # Final loss summary across all sweep runs
-    └── lora_math/              # Legacy single-run adapter output
+```bash
+./setup.sh
 ```
 
----
-
-## Pipeline
-
-**Fine-tuning** (`FineTune.ipynb`)
-1. Load Qwen2.5-0.5B-Instruct from HuggingFace
-2. Format GSM8K train split (~7,473 examples) as chat, tokenize with label masking
-3. Wrap model with LoRA adapters (`q/k/v/o_proj`)
-4. Train with HF `Trainer`; early-stop on loss convergence
-5. Save adapter weights + tokenizer per run
-
-**Inference** (`Main.ipynb`)
-1. Load base model + saved LoRA adapter
-2. Generate answers; RAG layer intercepts `[CALC: …]` placeholders, evaluates them, injects results
-3. Score against GSM8K test split (exact match)
-
----
-
-## Setup
+Or install manually:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Optional — 4-bit QLoRA (reduces VRAM ~40%):
-```bash
-pip install bitsandbytes
-# then set LOAD_IN_4BIT = True in qwen_math_flow/hyperparameters.py
-```
+## Repository Structure
 
----
+### Top level
 
-## Configuration
+- `bm_final.ipynb`: baseline benchmark notebook for the base Qwen model.
+- `finetuned_final.ipynb`: loads a saved LoRA adapter and benchmarks the fine-tuned model.
+- `rl_final.ipynb`: reward-based experiment notebook and evaluation export.
+- `llm_as_a_judge.ipynb`: samples examples from result files and writes smaller judge-review JSON files.
+- `README_finetune.md`: detailed write-up for our fine-tuning setup and results.
+- `requirements.txt`: Python dependencies.
+- `setup.sh`: creates `.venv`, installs dependencies, and register Jupyter kernel.
 
-All defaults live in `qwen_math_flow/hyperparameters.py`. Key knobs:
+### Result files
 
-| Parameter | Default | Effect |
-|---|---|---|
-| `MAX_TRAIN_SAMPLES` | `None` | `None` = full dataset; set an int for quick runs |
-| `NUM_EPOCHS` | `2` | Max epochs (early stopping may end sooner) |
-| `LORA_R` / `LORA_ALPHA` | `8` / `16` | LoRA rank and scaling |
-| `LOAD_IN_4BIT` | `False` | Enable QLoRA (requires bitsandbytes) |
+- `bm_results.json`: baseline benchmark outputs.
+- `ft_results.json`: fine-tuned model benchmark outputs.
+- `rl_results.json`: reward-based experiment outputs.
+- `bm_llm.json`: small random sample from baseline results for LLM as a judge/manual review.
+- `ft_llm.json`: small random sample from fine-tuned results for LLM as a judge/manual review.
+- `rl_llm.json`: small random sample from reward-based results for LLM as a judge/manual review.
 
-For hyperparameter sweeps, edit `PARAM_COMBINATIONS` in `FineTune.ipynb` and set `RUN_HYPERPARAMETER_SWEEP = True`.
+### Core package
 
----
+- `qwen_math_flow/__init__.py`: package exports.
+- `qwen_math_flow/download_model.py`: downloads/loads the Qwen model and tokenizer, with optional quantization.
+- `qwen_math_flow/load_dataset.py`: loads GSM8K, formats prompts/chat data, and tokenizes datasets.
+- `qwen_math_flow/lora_finetune.py`: LoRA setup, Trainer configuration, and early stopping callback.
+- `qwen_math_flow/hyperparameters.py`: central config values for training and inference.
 
-## Baseline results
+## External calculator tool-calling experimentation
+- `qwen_math_flow/rag_calculator.py`: calculator-augmented generation layer.
+- `qwen_math_flow/external_calculator.py`: calculator interfaces and a safe local evaluator.
+- `qwen_math_flow/test_rag_calculator.py`: simple smoke test for the calculator flow.
 
-Pre-fine-tune exact match on GSM8K questions:
+### Artifact folders
+- `output/fine_tune`: final training outputs, checkpoints, summaries from 5 sweep runs of LoRA fine tuning
+- `fine_tune/`: saved LoRA run artifacts from previous sweep runs, deprecated. 
+- `archive/`: older notebooks and previous experiment versions kept for future reference.
 
-| File | Samples | Exact match |
-|---|---|---|
-| `results.json` | 10 | 10% |
-| `daniil_results1.json` | 100 | 21% |
+Inside each fine-tune run folder, you will find the same artifact pattern:
 
-See `README_finetune.md` for fine-tuning design, metrics, and benchmark targets.
+- `adapter_model.safetensors`: trained LoRA weights.
+- `adapter_config.json`: adapter configuration.
+- `tokenizer.json` and `tokenizer_config.json`: tokenizer snapshot.
+- `training_summary.json`: run-level summary.
+- `trainer_log_history.json`: logged training metrics.
+- `training_run.log`: raw training log.
+
+## Suggested Reading Order
+
+1. `bm_final.ipynb` : our baseline model evaluation workflow.
+2. `finetune_final.ipynb`: our fine tuning experiments with diff configs, and the training logs.
+3. `finetune_inference_final.ipynb`:  shows how we load and evaluate the saved LoRA adapter on the test dataset.
+4. `rl_final.ipynb`: our reinforcement learning experiments.
+5. `README_finetune.md`: if you want more detail on the fine-tuning setup.   
+6. `qwen_math_flow/`: if you want the reusable Python code behind the notebooks.
